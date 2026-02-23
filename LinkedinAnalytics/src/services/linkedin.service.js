@@ -1,34 +1,89 @@
 import axios from "axios";
 
-export const fetchSharePosts = async () => {
-  const token = process.env.LINKEDIN_ACCESS_TOKEN;
-  const orgId = process.env.LINKEDIN_ORG_ID;
+const BASE = "https://api.linkedin.com/v2";
 
-  const url = `https://api.linkedin.com/v2/shares?q=owners&owners=${orgId}&count=50`;
-
-  const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  // LinkedIn returns BOTH share + UGC
-  const posts = (res.data.elements || []).filter(
-    p => p && p.content && p.id // remove UGC & invalid items
-  );
-
-  console.log("Total valid SHARE posts:", posts.length);
-
-  return posts;
+/** Extract full post metadata */
+export const extractPostDetails = (post) => {
+  return {
+    postId: post.id,
+    text: post?.text?.text || "",
+    postType: post?.content?.shareMediaCategory || "UNKNOWN",
+    postUrl: post?.content?.contentEntities?.[0]?.entity || "",
+    owner: post.owner || "",
+    createdAt: post?.created?.time
+      ? new Date(post.created.time).toISOString()
+      : null,
+  };
 };
 
-export const fetchPostStats = async (shareId) => {
+/** Fetch EXACT 15 LinkedIn share posts */
+export const fetchLatestPosts = async () => {
   const token = process.env.LINKEDIN_ACCESS_TOKEN;
   const orgId = process.env.LINKEDIN_ORG_ID;
 
-  const url = `https://api.linkedin.com/v2/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${orgId}&shares=urn:li:share:${shareId}`;
+  const required = 15;
+  const pageSize = 50;
 
-  const res = await axios.get(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  let start = 0;
+  let collected = [];
+  let hasMore = true;
 
-  return res.data.elements?.[0]?.totalShareStatistics || {};
+  while (collected.length < required && hasMore) {
+    const url = `${BASE}/shares?q=owners&owners=${orgId}&count=${pageSize}&start=${start}`;
+
+    const res = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const elements = res.data.elements || [];
+
+    const valid = elements.filter(
+      (p) => p?.id && p?.content && p?.text
+    );
+
+    collected.push(...valid);
+
+    if (!res.data.paging?.next) hasMore = false;
+
+    start += pageSize;
+  }
+
+  return collected.slice(0, required);
+};
+
+/** Fetch LinkedIn analytics for a post */
+export const fetchPostStats = async (postId) => {
+  const token = process.env.LINKEDIN_ACCESS_TOKEN;
+  const orgId = process.env.LINKEDIN_ORG_ID;
+
+  const url = `${BASE}/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${orgId}&shares=urn:li:share:${postId}`;
+
+  try {
+    const res = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    return (
+      res.data.elements?.[0]?.totalShareStatistics || {
+        likeCount: 0,
+        commentCount: 0,
+        impressionCount: 0,
+        uniqueImpressionsCount: 0,
+        shareCount: 0,
+        clickCount: 0,
+        engagement: 0,
+      }
+    );
+  } catch (err) {
+    console.error("LinkedIn Analytics Error:", err.message);
+    return {
+      likeCount: 0,
+      commentCount: 0,
+      impressionCount: 0,
+      uniqueImpressionsCount: 0,
+      shareCount: 0,
+      clickCount: 0,
+      engagement: 0,
+    };
+  }
 };

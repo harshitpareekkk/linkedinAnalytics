@@ -1,20 +1,26 @@
-import express from "express";
 import dotenv from "dotenv";
-import analyticsRoutes from "./src/routes/analytics.routes.js";
-
 dotenv.config();
+
+import express from "express";
+import syncRoutes from "./src/routes/sync.routes.js";
 
 const app = express();
 app.use(express.json());
+app.use("/api", syncRoutes);
 
-// Register Routes
-app.use("/api", analyticsRoutes);
+const PORT = process.env.PORT || 4000;
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000...");
-  console.log("ENV CHECK:", {
-    token: process.env.LINKEDIN_ACCESS_TOKEN?.slice(0, 20) + "...",
-    org: process.env.LINKEDIN_ORG_ID,
-    board: process.env.MONDAY_BOARD_ID
-  });
+// Debug checks
+console.log("=".repeat(50));
+console.log("🔧 ENVIRONMENT CHECK");
+console.log("=".repeat(50));
+console.log("✅ MONDAY_API_KEY:", process.env.MONDAY_API_KEY ? "Present" : "❌ Missing");
+console.log("✅ MONDAY_BOARD_ID:", process.env.MONDAY_BOARD_ID ? "Present" : "❌ Missing");
+console.log("✅ LINKEDIN_ACCESS_TOKEN:", process.env.LINKEDIN_ACCESS_TOKEN ? "Present" : "❌ Missing");
+console.log("✅ LINKEDIN_ORG_ID:", process.env.LINKEDIN_ORG_ID ? "Present" : "❌ Missing");
+console.log("=".repeat(50));
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 Sync endpoint: http://localhost:${PORT}/api/sync`);
 });
