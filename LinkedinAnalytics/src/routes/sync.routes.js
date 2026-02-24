@@ -1,7 +1,7 @@
 /**
  * sync.routes.js
  *
- * POST   /api/sync                → Sync LinkedIn posts to Monday Storage
+ * POST   /api/sync                → Sync last 3 months LinkedIn posts to Monday Storage
  * GET    /api/storage             → Get ALL stored posts (complete info)
  * GET    /api/storage/:postId     → Get ONE post complete info by postId
  * DELETE /api/storage             → Delete all stored posts
@@ -22,7 +22,7 @@ const router = express.Router();
 const getToken = (req) =>
   req.headers.authorization?.replace("Bearer ", "") || process.env.MONDAY_API_KEY;
 
-// Helper to shape a raw stored post into a clean response object
+// Shape a raw stored post into a clean API response
 const formatPost = (post) => ({
   postId: post.postId,
   details: {
@@ -49,36 +49,28 @@ const formatPost = (post) => ({
 router.post("/sync", syncLinkedInPosts);
 
 // ── GET /api/storage ───────────────────────────────────────────────────────────
-// Returns ALL posts with complete info: details + analytics + timestamps
 router.get("/storage", async (req, res) => {
   try {
     const token = getToken(req);
     if (!token) return res.status(401).json({ error: "Missing Monday API token" });
 
-    const posts = await getAllStoredPosts(token);
+    const posts   = await getAllStoredPosts(token);
     const entries = posts.map(formatPost);
 
-    res.status(200).json({
-      success: true,
-      total: entries.length,
-      entries,
-    });
+    res.status(200).json({ success: true, total: entries.length, entries });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ── GET /api/storage/:postId ───────────────────────────────────────────────────
-// Returns ONE post's complete info
 router.get("/storage/:postId", async (req, res) => {
   try {
     const token = getToken(req);
     if (!token) return res.status(401).json({ error: "Missing Monday API token" });
 
     const post = await getStoredPost(token, req.params.postId);
-    if (!post) {
-      return res.status(404).json({ success: false, error: "Post not found" });
-    }
+    if (!post) return res.status(404).json({ success: false, error: "Post not found" });
 
     res.status(200).json({ success: true, post: formatPost(post) });
   } catch (err) {
@@ -98,7 +90,7 @@ router.delete("/storage", async (req, res) => {
   }
 });
 
-// ── DELETE /api/storage/:postId ────────────────────────────────────────────────
+// ── DELETE /api/storage/:postId
 router.delete("/storage/:postId", async (req, res) => {
   try {
     const token = getToken(req);

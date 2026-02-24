@@ -7,8 +7,6 @@
  *   The SDK does NOT auto-serialize objects or arrays.
  *   - Passing an object → stored as "[object Object]"
  *   - Passing an array  → stored as "id1,id2,id3"
- *   - Passing a string  → stored correctly as-is
- *
  *   FIX: Always JSON.stringify() before set(), always JSON.parse() after get().
  *
  * SDK METHOD SIGNATURES:
@@ -24,20 +22,20 @@
 import { Storage } from "@mondaycom/apps-sdk";
 import { logger } from "../utils/logger.js";
 
-const SHARED = { shared: true };
+const SHARED    = { shared: true };
 const INDEX_KEY = "linkedin_post_index";
-const postKey = (postId) => `post_${postId}`;
+const postKey   = (postId) => `post_${postId}`;
 
 // ─── Safe JSON helpers ────────────────────────────────────────────────────────
 
-const toStorage = (value) => JSON.stringify(value);
+const toStorage   = (value) => JSON.stringify(value);
 
 const fromStorage = (raw) => {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === "string") {
     try { return JSON.parse(raw); } catch { return null; }
   }
-  return raw; // already parsed (future-proof)
+  return raw;
 };
 
 // ─── Index helpers ────────────────────────────────────────────────────────────
@@ -50,7 +48,7 @@ const readIndex = async (storage) => {
     }
     const ids = fromStorage(res.value);
     return {
-      ids: Array.isArray(ids) ? ids : [],
+      ids:     Array.isArray(ids) ? ids : [],
       version: res.version || null,
     };
   } catch {
@@ -73,7 +71,7 @@ const writeIndex = async (storage, ids, previousVersion) => {
 export const getStoredPost = async (token, postId) => {
   try {
     const storage = new Storage(token);
-    const res = await storage.get(postKey(postId), SHARED);
+    const res     = await storage.get(postKey(postId), SHARED);
 
     if (!res || !res.success || res.value === null || res.value === undefined) {
       console.log(`[storage] GET ${postId} → NOT FOUND`);
@@ -100,7 +98,6 @@ export const savePostToStorage = async (token, postObj) => {
 
     // 1. Save the post as a JSON string
     const setRes = await storage.set(postKey(postId), toStorage(postObj), SHARED);
-
     if (!setRes.success) {
       logger.error(`[storage] SAVE FAILED ${postId}: ${setRes.error}`);
       return { success: false, error: setRes.error };
@@ -108,9 +105,7 @@ export const savePostToStorage = async (token, postObj) => {
 
     // 2. Update the index
     const { ids, version } = await readIndex(storage);
-    if (!ids.includes(postId)) {
-      ids.push(postId);
-    }
+    if (!ids.includes(postId)) ids.push(postId);
     await writeIndex(storage, ids, version);
 
     console.log(`[storage] SAVED ${postId} ✅  (index size: ${ids.length})`);
@@ -131,7 +126,7 @@ export const updatePostInStorage = async (token, postId, updatedPostObj) => {
     // Get current version for optimistic locking
     let previousVersion = null;
     try {
-      const cur = await storage.get(postKey(postId), SHARED);
+      const cur    = await storage.get(postKey(postId), SHARED);
       previousVersion = cur?.version || null;
     } catch { /* key not found, write fresh */ }
 
@@ -141,7 +136,6 @@ export const updatePostInStorage = async (token, postId, updatedPostObj) => {
     const setRes = await storage.set(postKey(postId), toStorage(updatedPostObj), opts);
 
     if (!setRes.success) {
-      // Version conflict — retry without lock
       logger.warn(`[storage] UPDATE version conflict for ${postId}, retrying without lock`);
       await storage.set(postKey(postId), toStorage(updatedPostObj), SHARED);
     }
@@ -159,9 +153,9 @@ export const updatePostInStorage = async (token, postId, updatedPostObj) => {
  */
 export const getAllStoredPosts = async (token) => {
   try {
-    const storage = new Storage(token);
-    const { ids } = await readIndex(storage);
-    console.log(`[storage] Index has ${ids.length} postIds:`, ids);
+    const storage    = new Storage(token);
+    const { ids }    = await readIndex(storage);
+    console.log(`[storage] Index has ${ids.length} postIds`);
 
     if (ids.length === 0) return [];
 
@@ -212,8 +206,8 @@ export const deleteStoredPost = async (token, postId) => {
  */
 export const deleteAllStoredPosts = async (token) => {
   try {
-    const storage = new Storage(token);
-    const { ids } = await readIndex(storage);
+    const storage  = new Storage(token);
+    const { ids }  = await readIndex(storage);
 
     console.log(`[storage] Deleting ${ids.length} posts...`);
     for (const postId of ids) {
