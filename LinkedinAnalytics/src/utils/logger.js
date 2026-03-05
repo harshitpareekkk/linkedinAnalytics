@@ -1,19 +1,29 @@
-// Simple logger utility for consistent logging
-// Usage: import { logger } from '../utils/logger.js';
+export const LOG_LEVELS = {
+    INFO: "info",
+    ERROR: "error",
+    DEBUG: "debug",
+    WARN: "warn"
+  };
+
+  function formatMessage(level, message) {
+  const timestamp = new Date().toISOString();
+  if (typeof message == "object") {
+    message = JSON.stringify(message, null, 2);
+  }
+  return `[${timestamp}] [${level.toUpperCase()}]: ${message}`;
+}
 
 export const logger = {
-  info: (...args) => {
-    console.log("[INFO]", ...args);
+  info: (msg) => {
+    console.info(formatMessage(LOG_LEVELS.INFO, msg));
   },
-  warn: (...args) => {
-    console.warn("[WARN]", ...args);
+  error: (msg) => {
+    console.error(formatMessage(LOG_LEVELS.ERROR, msg));
   },
-  error: (...args) => {
-    console.error("[ERROR]", ...args);
+  debug: (msg) => {
+    console.debug(formatMessage(LOG_LEVELS.DEBUG, msg));
   },
-  debug: (...args) => {
-    if (process.env.DEBUG === "true") {
-      console.debug("[DEBUG]", ...args);
-    }
-  }
+  warn: (msg) => {
+    console.warn(formatMessage(LOG_LEVELS.WARN, msg));
+  },
 };

@@ -1,4 +1,6 @@
-export const STATUS_CODES = {
+// src/constants/status.constants.js
+
+export const StatusCodes = {
   OK: 200,
   CREATED: 201,
   BAD_REQUEST: 400,

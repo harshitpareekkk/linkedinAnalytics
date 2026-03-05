@@ -1,22 +1,3 @@
-/**
- * linkedin.service.js
- *
- * What we extract per post:
- *   postId       → LinkedIn share numeric ID (e.g. "7431996441511907329")
- *   text         → FULL post text (never truncated)
- *   postType     → RICH / TEXT / IMAGE / VIDEO / DOCUMENT / ARTICLE
- *   postUrl      → Real LinkedIn post URL:
- *                  https://www.linkedin.com/feed/update/urn:li:share:{postId}
- *   owner        → org URN (urn:li:organization:219773)
- *   authorId     → person URN who posted (urn:li:person:abc123) — from post.author
- *   authorName   → resolved full name ("Shubham Mehta")
- *   createdAt    → ISO date string ("2026-01-02T12:01:40.485Z")
- *
- * Analytics per post:
- *   likeCount, commentCount, impressionCount, uniqueImpressionsCount,
- *   shareCount, clickCount, engagement (raw rate), ctr (clicks/impressions × 100)
- */
-
 import axios from "axios";
 
 const BASE      = "https://api.linkedin.com/v2";
