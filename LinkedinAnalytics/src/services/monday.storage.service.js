@@ -62,7 +62,7 @@ const writeIndex = async (storage, ids, previousVersion) => {
   await storage.set(INDEX_KEY, toStorage(ids), opts);
 };
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ─── Public API
 
 /**
  * Get a single post by postId.
