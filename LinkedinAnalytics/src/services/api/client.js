@@ -7,6 +7,7 @@ const axiosInstance = axios.create({
   baseURL: MONDAY_API_URL,
   headers: {
     "Content-Type": "application/json",
+    "API-Version": "2024-10",
   },
   timeout: 15000,
 });

@@ -1,26 +1,9 @@
 /**
  * monday.board.service.js
  *
- * All GraphQL calls go through the shared axiosInstance (client.js).
- * Token is injected via setMondayToken(token) before each call.
- * No "API-Version" header — client.js intentionally omits it so Monday
- * uses the default version, which avoids "Unauthorized field or type" errors.
- *
- * ─── KEY FIXES ───────────────────────────────────────────────────────────────
- *
- * FIX 1 — boards() query variable type:
- *   Wrong : query ($boardIds: [ID!])  { boards(ids: $boardIds) }
- *   Correct: boards query does NOT use a variable — pass the board ID inline
- *   as a hardcoded string in the query. This is the safest approach and
- *   avoids ALL "Unauthorized field or type" issues with the variable schema.
- *
- * FIX 2 — numeric column values must be STRINGS:
- *   Monday's column_values JSON requires numeric columns as "123" not 123.
- *   A JS number silently fails — the column appears to save but shows blank.
- *
- * FIX 3 — testMondayAccess uses `me { id }` which may return undefined for
- *   shortLivedTokens. Changed to a boards query against the real board ID so
- *   the token test is meaningful and actually confirms board access.
+ * Uses monday-sdk-js for all GraphQL calls (Seamless Authentication).
+ * The shortLivedToken from the JWT payload is passed to monday.setToken()
+ * before each call — the SDK handles auth headers and API versioning.
  *
  * ─── BOARD COLUMN LAYOUT ─────────────────────────────────────────────────────
  *
@@ -42,21 +25,28 @@
  *  CTR                 numeric    "8.65"
  */
 
-import axiosInstance, { setMondayToken } from "./api/client.js";
-import { logger }                        from "../utils/logger.js";
+import mondaySdk from "monday-sdk-js";
+import { logger } from "../utils/logger.js";
+
+// ─── SDK instance ─────────────────────────────────────────────────────────────
+const monday = mondaySdk();
 
 // ─── GraphQL helper ───────────────────────────────────────────────────────────
 
 const gql = async (token, query, variables = {}) => {
-  setMondayToken(token);
-  const res = await axiosInstance.post("", { query, variables });
+  monday.setToken(token);
+  const res = await monday.api(query, {
+    token,
+    variables,
+    apiVersion: "2023-10",
+  });
 
-  if (res.data?.errors?.length) {
-    const msg = res.data.errors.map((e) => e.message).join(" | ");
+  if (res.errors?.length) {
+    const msg = res.errors.map((e) => e.message).join(" | ");
     throw new Error(`Monday API error: ${msg}`);
   }
 
-  return res.data?.data;
+  return res.data;
 };
 
 // ─── Token / board access test ────────────────────────────────────────────────
@@ -64,23 +54,14 @@ const gql = async (token, query, variables = {}) => {
 // shortLivedTokens may not have "me" access, so we query the board directly.
 
 export const testMondayAccess = async (token, boardId) => {
-  setMondayToken(token);
-  // Use inline board ID — avoids variable type issues entirely
-  const query = `
-    query {
-      boards(ids: ["${boardId}"]) {
-        id
-        name
-      }
-    }
-  `;
+  const query = `query { boards(ids: [${boardId}]) { id name } }`;
   try {
-    const res = await axiosInstance.post("", { query });
-    const board = res.data?.data?.boards?.[0];
+    const data = await gql(token, query);
+    const board = data?.boards?.[0];
     console.log(`[board] ✅ Token valid — board: "${board?.name || "unknown"}" (id=${board?.id || boardId})`);
     return board;
   } catch (err) {
-    console.error("[board] ❌ Token/board test failed:", err.response?.data || err.message);
+    console.error("[board] ❌ Token/board test failed:", err.message);
     throw err;
   }
 };
@@ -146,10 +127,9 @@ const formatValue = (value, colType) => {
 // ID! vs String! variable type ambiguity across Monday API versions.
 
 export const fetchBoardColumns = async (token, boardId) => {
-  // Inline the boardId — no variables, no type mismatch possible
   const query = `
     query {
-      boards(ids: ["${boardId}"]) {
+      boards(ids: [${boardId}]) {
         id
         name
         columns {
@@ -161,15 +141,9 @@ export const fetchBoardColumns = async (token, boardId) => {
     }
   `;
 
-  setMondayToken(token);
-  const res = await axiosInstance.post("", { query });
+  const data = await gql(token, query);
 
-  if (res.data?.errors?.length) {
-    const msg = res.data.errors.map((e) => e.message).join(" | ");
-    throw new Error(`Monday API error: ${msg}`);
-  }
-
-  const board = res.data?.data?.boards?.[0];
+  const board = data?.boards?.[0];
   if (!board) {
     throw new Error(
       `Board "${boardId}" not found. Check MONDAY_BOARD_ID and that the token has access to this board.`
@@ -350,10 +324,9 @@ export const updateBoardItem = async (token, itemId, analytics, columnMap, colum
 // Works because item_name = postId (set in createBoardItem above).
 
 export const findBoardItemByPostId = async (token, postId, boardId) => {
-  // Inline board ID to avoid variable type issues
   const query = `
     query {
-      boards(ids: ["${boardId}"]) {
+      boards(ids: [${boardId}]) {
         items_page(limit: 500) {
           items { id name }
         }
@@ -362,9 +335,8 @@ export const findBoardItemByPostId = async (token, postId, boardId) => {
   `;
 
   try {
-    setMondayToken(token);
-    const res   = await axiosInstance.post("", { query });
-    const items = res.data?.data?.boards?.[0]?.items_page?.items || [];
+    const data  = await gql(token, query);
+    const items = data?.boards?.[0]?.items_page?.items || [];
     const match = items.find((item) => item.name === String(postId) || item.name?.includes(String(postId)));
 
     if (match) {

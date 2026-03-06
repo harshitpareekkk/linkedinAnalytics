@@ -39,7 +39,6 @@
  *   The for...of + await loop ensures each post fully completes before next.
  */
 
-import { setMondayToken }            from "../services/api/client.js";
 import {
   fetchLastThreeMonthsPosts,
   fetchPostStats,
@@ -70,19 +69,17 @@ export const syncLinkedInPosts = async (req, res) => {
 
     // ── Token ─────────────────────────────────────────────────
     // shortLivedToken is set by authorizeRequest middleware after JWT decode.
-    // It gives us access to the Monday Board API and Storage SDK.
+    // It gives us access to the Monday Board API (via SDK) and Storage SDK.
     const shortLivedToken = req.session?.shortLivedToken;
 
     if (!shortLivedToken) {
       logger.error("[sync] No shortLivedToken in session — JWT decode may have failed");
-      return res.status(STATUS_CODES.UNAUTHORIZED).json({
+      return res.status(StatusCodes.UNAUTHORIZED).json({
         success: false,
         error:   MESSAGES.NOT_AUTHENTICATED,
       });
     }
 
-    // Set token globally for all axiosInstance calls (board service uses this)
-    setMondayToken(shortLivedToken);
     logger.info(`[sync] ✅ Token ready | accountId=${req.session?.accountId}`);
 
     // ── Board ID ──────────────────────────────────────────────
@@ -94,7 +91,7 @@ export const syncLinkedInPosts = async (req, res) => {
     );
 
     if (!boardId) {
-      return res.status(STATUS_CODES.BAD_REQUEST).json({
+      return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         error:   "Missing boardId — set MONDAY_BOARD_ID in .env or pass via automation inputFields",
       });
@@ -112,7 +109,7 @@ export const syncLinkedInPosts = async (req, res) => {
       await testMondayAccess(shortLivedToken, boardId);
     } catch (err) {
       logger.error(`[sync] Board access test failed: ${err.message}`);
-      return res.status(STATUS_CODES.UNAUTHORIZED).json({
+      return res.status(StatusCodes.UNAUTHORIZED).json({
         success: false,
         error:   `Cannot access board ${boardId}: ${err.message}`,
       });
@@ -129,7 +126,7 @@ export const syncLinkedInPosts = async (req, res) => {
       console.log(`✅ Fetched ${columns.length} board columns`);
     } catch (err) {
       logger.error(`[sync] Board columns fetch failed: ${err.message}`);
-      return res.status(STATUS_CODES.INTERNAL_SERVER_ERROR).json({
+      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
         success: false,
         error:   `Board columns fetch failed: ${err.message}`,
       });
@@ -303,7 +300,7 @@ export const syncLinkedInPosts = async (req, res) => {
   } catch (err) {
     logger.error(`[sync] ❌ SYNC ERROR: ${err.message}`);
     console.error(err);
-    return res.status(STATUS_CODES.INTERNAL_SERVER_ERROR).json({
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       error:   err.message,
     });
